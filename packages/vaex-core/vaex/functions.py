@@ -2676,3 +2676,11 @@ def where(condition, x, y, dtype=None):
     ar = np.where(condition, x, y)
 
     return ar
+
+
+@register_function(on_expression=False)
+def stack(arrays, strict=False):
+    '''Stack multiple arrays into a multidimensional array'''
+    arrays = [vaex.arrow.numpy_dispatch.unwrap(k) for k in arrays]
+    arrays = [vaex.array_types.to_numpy(k) for k in arrays]
+    return np.ma.stack(arrays, axis=1)

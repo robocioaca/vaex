@@ -1,6 +1,8 @@
 import os
 import numpy as np
 
+import dask.base
+
 from .stat import _Statistic
 from vaex import encoding
 from .datatype import DataType
@@ -298,3 +300,8 @@ def nunique(expression, dropna=False, dropnan=False, dropmissing=False, selectio
 #     '''Creates a standard deviation aggregation'''
 #     return _Statistic('correlation', x, y)
 
+
+
+@dask.base.normalize_token.register(AggregatorDescriptor)
+def normalize(agg):
+    return agg.__class__.__name__, repr(agg)

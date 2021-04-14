@@ -165,6 +165,7 @@ class GroupByBase(object):
             by = [by]
 
         self.by = []
+        self.by_original = by
         for by_value in by:
             if not isinstance(by_value, BinnerBase):
                 if df.is_category(by_value):
@@ -336,9 +337,77 @@ class GroupBy(GroupByBase):
 
         mask = counts > 0
         coords = [coord[mask] for coord in np.meshgrid(*self.coords1d, indexing='ij')]
-        labels = {str(by.expression): coord for by, coord in zip(self.by, coords)}
-        df_grouped = vaex.from_dict(labels)
+        columns = {str(by.expression): coord for by, coord in zip(self.by, coords)}
+        # df_grouped = vaex.from_dict(labels)
         for key, value in arrays.items():
-            df_grouped[key] = value[mask]
+            columns[key] = value[mask]
+        dataset = vaex.dataset.DatasetArrays(columns)
+        # df = vaex.d
+        dataset = DatasetGroupby(dataset, self.df, self.by_original, actions)
+        df_grouped = vaex.from_dataset(dataset)
         return df_grouped
 
+
+@vaex.dataset.register
+class DatasetGroupby(vaex.dataset.DatasetDecorator):
+    '''Wraps a resulting dataset from a dataframe groupby, so the groupby can be serialized'''
+    snake_name = 'groupby'
+    def __init__(self, original, df, by, agg):
+        assert isinstance(original, vaex.dataset.DatasetArrays)
+        super().__init__(original)
+        self.df = df
+        self.by = by
+        self.agg = agg
+        self._row_count = self.original.row_count
+        self._create_columns()
+
+    def _create_columns(self):
+        # we know original is a DatasetArrays
+        self._columns = self.original._columns.copy()
+        self._ids = self.original._ids.copy()
+
+    @property
+    def _fingerprint(self):
+        by = self.by
+        by = str(by) if not isinstance(by, (list, tuple)) else list(map(str, by))
+        id = vaex.cache.fingerprint(self.original.fingerprint, self.df, by, self.agg)
+        return f'dataset-{self.snake_name}-{id}'
+
+    def chunk_iterator(self, *args, **kwargs):
+        yield from self.original.chunk_iterator(*args, **kwargs)
+
+    def hashed(self):
+        return type(self)(self.original.hashed(), df=self.df, by=self.by, agg=self.agg)
+
+    def _encode(self, encoding):
+        by = self.by
+        by = str(by) if not isinstance(by, (list, tuple)) else list(map(str, by))
+        spec = {
+            'dataframe': encoding.encode('dataframe', self.df),
+            'by': by,
+            'aggregation': encoding.encode_collection('aggregation', self.agg),
+        }
+        return spec
+
+    @classmethod
+    def _decode(cls, encoding, spec):
+        df = encoding.decode('dataframe', spec['dataframe'])
+        by = spec['by']
+        agg = encoding.decode_collection('aggregation', spec['aggregation'])
+        dfg = df.groupby(by, agg=agg)
+        return DatasetGroupby(dfg.dataset.original, df, by, agg)
+
+    def __getstate__(self):
+        state = self.__dict__.copy()
+        del state['original']
+        return state
+
+    def __setstate__(self, state):
+        self.__dict__.update(state)
+        self.original = self.df.groupby(self.by, agg=self.agg).dataset.original
+        # self._create_columns()
+
+    def slice(self, start, end):
+        if start == 0 and end == self.row_count:
+            return self
+        return DatasetSlicedArrays(self, start=start, end=end)

@@ -200,6 +200,10 @@ class Expression(with_metaclass(Meta)):
         self.df._expressions.append(weakref.ref(self))
         self._ast_names = None
 
+    def fingerprint(self):
+        fp = vaex.cache.fingerprint(self.expression, self.df.fingerprint())
+        return f'expression-{fp}'
+
     def copy(self, df=None):
         """Efficiently copies an expression.
 

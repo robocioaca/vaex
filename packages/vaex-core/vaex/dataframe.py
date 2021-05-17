@@ -2226,7 +2226,7 @@ class DataFrame(object):
                      descriptions=descriptions,
                      active_range=[self._index_start, self._index_end]
         )
-        datasets = self.dataset.leafs() if skip is None else skip 
+        datasets = self.dataset.leafs() if skip is None else skip
         for dataset in datasets:
             # mark leafs to not encode
             encoding._object_specs[dataset.id] = None
@@ -2477,7 +2477,7 @@ class DataFrame(object):
 
 
 
-    def state_write(self, file, fs_options=None, fs=None):
+    def state_write(self, file, fs_options=None, fs=None, skip=None):
         """Write the internal state to a json or yaml file (see :meth:`DataFrame.state_get`)
 
         Example
@@ -2546,7 +2546,8 @@ class DataFrame(object):
         :param fs: 'Pass a file system object directly, see :func:`vaex.open`'
         """
         fs_options = fs_options or {}
-        vaex.utils.write_json_or_yaml(file, self.state_get(), fs_options=fs_options, fs=fs)
+        state = self.state_get(skip=skip)
+        vaex.utils.write_json_or_yaml(file, state, fs_options=fs_options, fs=fs)
 
     def state_load(self, file, use_active_range=False, keep_columns=None, set_filter=True, trusted=True, fs_options=None, fs=None):
         """Load a state previously stored by :meth:`DataFrame.state_write`, see also :meth:`DataFrame.state_set`.

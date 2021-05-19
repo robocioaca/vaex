@@ -46,6 +46,7 @@ class BinnerTime(BinnerBase):
         self.sort_indices = None
         # make sure it's an expression
         self.expression = self.df[str(self.expression)]
+        self.label = str(self.expression)
         self.tmin, self.tmax = self.df[str(self.expression)].minmax()
 
         self.resolution_type = 'M8[%s]' % self.resolution
@@ -89,6 +90,7 @@ class Grouper(BinnerBase):
         self.expression = expression
         # make sure it's an expression
         self.expression = self.df[str(self.expression)]
+        self.label = str(self.expression)
         set = self.df._set(self.expression)
         keys = set.keys()
         if self.sort:
@@ -131,11 +133,13 @@ class GrouperCategory(BinnerBase):
     def __init__(self, expression, df=None, sort=False):
         self.df = df or expression.ds
         self.sort = sort
-        self.expression = expression
         # make sure it's an expression
-        self.expression = self.df[str(self.expression)]
+        expression = self.df[str(expression)]
+        self.expression_original = expression
+        self.label = str(self.expression_original)
+        self.expression = expression.index_values() if expression.dtype.is_encoded else expression
 
-        self.bin_values = self.df.category_labels(self.expression)
+        self.bin_values = self.df.category_labels(self.expression_original)
         if self.sort:
             # None will always be the first value
             if self.bin_values[0] is None:
@@ -147,8 +151,8 @@ class GrouperCategory(BinnerBase):
         else:
             self.sort_indices = None
 
-        self.N = self.df.category_count(self.expression)
-        self.min_value = self.df.category_offset(self.expression)
+        self.N = self.df.category_count(self.expression_original)
+        self.min_value = self.df.category_offset(self.expression_original)
         # TODO: what do we do with null values for categories?
         # if self.set.has_null:
         #     self.N += 1
@@ -336,7 +340,7 @@ class GroupBy(GroupByBase):
 
         mask = counts > 0
         coords = [coord[mask] for coord in np.meshgrid(*self.coords1d, indexing='ij')]
-        labels = {str(by.expression): coord for by, coord in zip(self.by, coords)}
+        labels = {str(by.label): coord for by, coord in zip(self.by, coords)}
         df_grouped = vaex.from_dict(labels)
         for key, value in arrays.items():
             df_grouped[key] = value[mask]

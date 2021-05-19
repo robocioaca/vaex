@@ -233,6 +233,7 @@ class ExecutorLocal(Executor):
                 chunks = {k:vaex.array_types.filter(v, filter_mask) for k, v, in chunks.items()}
             else:
                 filter_mask = None
+            chunks = {name: df._auto_encode_data(name, ar) for name, ar in chunks.items()}
             chunks = {name: vaex.arrow.numpy_dispatch.wrap(ar) for name, ar in chunks.items()}
             block_scope.values.update(chunks)
             block_scope.mask = filter_mask
